@@ -1,0 +1,45 @@
+# Flutter/Dart related
+build/
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+pubspec.lock
+
+# Android related
+gen/
+*.iml
+*.ipr
+*.iws
+.idea/
+.gradle/
+local.properties
+*.keystore
+*.jks
+*.apk
+*.aab
+
+# iOS related
+*.swp
+*.lock
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+xcuserdata/
+DerivedData/
+Podfile.lock
+Pods/
+ServiceDefinitions.json
+Runner.xcworkspace
+
+# Web related
+.web/
+
+# IDE related
+.vscode/
+.idea/
+*.iml
+
+# Sensitive information
+.env*
+security/
