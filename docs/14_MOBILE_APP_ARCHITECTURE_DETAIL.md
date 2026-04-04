@@ -9,10 +9,10 @@ Dự án này mở rộng nền tảng Web hiện tại thành một hệ sinh t
 ```mermaid
 graph TD
     subgraph "Cloud Backend (Supabase)"
-        DB[(PostgreSQL + PostGIS)]
+        DB[(PostgreSQL + pgvector)]
         Storage[Supabase Storage]
         Auth[Supabase Auth]
-        Edge[Edge Functions - RAG AI]
+        Edge[Edge Functions - Deno RAG AI streaming]
     end
 
     subgraph "Admin & Content (Web)"
@@ -20,13 +20,15 @@ graph TD
         CMS[Headless CMS Logic]
     end
 
-    subgraph "Mobile Client (Flutter)"
+    subgraph "Mobile Client (Flutter - Heritage Editorial UI)"
         App[Flutter App - Super Client]
-        Nav[Bottom Navigation Bar]
+        Nav[Glass Bottom Navigation Bar]
         HomeTab[Home - Smart Feed]
-        MapTab[Discovery - Google Maps]
+        MapTab[Discovery - OpenStreetMap]
+        AITab[Thầy Số - RAG Chatbot]
         DharmaTab[Dharma - Media Player]
-        MeritTab[Merit - QR Payment]
+        MeritTab[Merit - Transparent Ledger & VietQR]
+        ProfileTab[Profile - Config]
     end
 
     NextAdmin --> DB
@@ -34,6 +36,7 @@ graph TD
     App --> Storage
     App --> Auth
     Edge --> DB
+    App -.->|SSE Stream| Edge
 ```
 
 ---
@@ -55,7 +58,7 @@ graph TD
 ## 3. Chi tiết các Phân hệ chức năng
 
 ### **A. Khám phá (Discovery - Map & GPS)**
-- **Công nghệ:** Google Maps SDK for Flutter + PostGIS.
+- **Công nghệ:** flutter_map (OpenStreetMap) + PostGIS.
 - **Tính năng ĐATN:** 
     - Truy vấn SQL "Chùa gần tôi" sử dụng toán tử `<->` trong PostGIS để đạt hiệu năng O(1) với Index GIST.
     - **Geofencing:** Khi `current_location` nằm trong bán kính 200m của `geog`, gửi thông báo chào mừng qua FCM.
@@ -66,20 +69,21 @@ graph TD
     - **Offline Sync:** Sử dụng `Isar` hoặc `Hive` để lưu metadata kinh sách.
     - Đồng bộ bài giảng từ `dharma_talks` trên Web Admin.
 
-### **C. Phước điền (Merit - Transparency)**
+### **C. Công Đức & Minh Bạch (Merit - Zen Ledger)**
 - **Tính năng ĐATN:**
-    - Tích hợp **VietQR** động: Tự động truyền số tiền và nội dung (Mã dự án) vào QR.
-    - **Sổ cái minh bạch:** Hiển thị Real-time danh sách đóng góp đã duyệt tự động từ Web.
+    - Tích hợp **VietQR** động: Tự động truyền số tiền và nội dung vào QR, trình bày trong Giao diện "Frosted Glass".
+    - **Sổ Vàng Công Đức (Minh bạch):** Hiển thị danh sách cúng dường với layout dạng "Cuốn sổ lụa" (Heritage Editorial), loại bỏ vạch ngăn để tăng tính thiền (Zen space). Cập nhật realtime từ hệ thống.
 
 ---
 
 ## 4. Tính năng "Ghi điểm" (Advanced Features)
 
-### **1. AI Dharma Bot (RAG)**
+### **1. AI Dharma Bot (RAG Cố Vấn "Thầy Số")**
 - **Quy trình:** 
-    1. Vectorize dữ liệu từ `about_sections` và `dharma_talks` (dùng pgvector).
-    2. Mobile gửi câu hỏi của Phật tử lên Supabase Edge Function.
-    3. AI (Gemini/OpenAI) truy xuất ngữ cảnh và trả lời theo phong cách Nam Tông.
+    1. Lưu trữ và đánh chỉ mục ngữ nghĩa tài liệu bằng cấu trúc `dharma_documents` và `pgvector` (`dharma_embeddings`) dùng OpenAI `text-embedding-3-small`.
+    2. Mobile (Flutter) gửi câu hỏi lên Deno Edge Function (`rag-chat`).
+    3. AI (`gpt-4o-mini`) truy xuất hàm Cosine Search, tính toán tư vấn theo phong cách thiền sư và trả về **Stream** qua định dạng Server-Sent Events (SSE).
+    4. Mobile sử dụng `StreamBuilder` để hiển thị chữ kiểu "đang gõ" trên form bong bóng Glassmorphism kèm Trích dẫn (Citation Badges) minh bạch.
 
 ### **2. Augmented Reality (AR) Gateway**
 - Sử dụng `ARCore`/`ARKit` cơ bản.
