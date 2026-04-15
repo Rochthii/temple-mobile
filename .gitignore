@@ -43,3 +43,7 @@ Runner.xcworkspace
 # Sensitive information
 .env*
 security/
+
+# Bulky Assets
+*.pdf
+*.txt
