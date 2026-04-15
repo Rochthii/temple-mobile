@@ -136,7 +136,7 @@ CREATE TABLE dharma_embeddings (
 ## 5. Lộ trình Triển khai (Roadmap)
 
 1. **Tuần 1-2:** Hoàn thiện Web Core, chuẩn hóa Schema đa thuê bao (Multi-tenant) - **[DONE]**.
-2. **Tuần 3-4:** Khởi tạo Flutter Project, tích hợp Google Maps & PostGIS Query.
+2. **Tuần 3-4:** Khởi tạo Flutter Project, tích hợp OpenStreetMap & PostGIS Query.
 3. **Tuần 5-6:** Phát triển AI RAG Pipeline & Thư viện Pháp thoại.
 4. **Tuần 7-8:** Tích hợp VietQR, kiểm thử toàn diện và đóng gói báo cáo.
 
@@ -212,7 +212,7 @@ graph TD
 ## 3. Chi tiết các Phân hệ chức năng
 
 ### **A. Khám phá (Discovery - Map & GPS)**
-- **Công nghệ:** Google Maps SDK for Flutter + PostGIS.
+- **Công nghệ:** flutter_map (OpenStreetMap) + PostGIS.
 - **Tính năng ĐATN:** 
     - Truy vấn SQL "Chùa gần tôi" sử dụng toán tử `<->` trong PostGIS để đạt hiệu năng O(1) với Index GIST.
     - **Geofencing:** Khi `current_location` nằm trong bán kính 200m của `geog`, gửi thông báo chào mừng qua FCM.
@@ -448,7 +448,7 @@ flowchart TD
 - **Backend-as-a-Service:** Supabase (PostgreSQL, Auth, Storage, Edge Functions).
 - **Integration:** 
     - **FCM** cho thông báo.
-    - **Google Maps API** cho bản đồ.
+    - **OpenStreetMap** cho bản đồ (Miễn phí).
     - **Gemini API** cho trí tuệ nhân tạo.
 
 ---
@@ -458,3 +458,317 @@ flowchart TD
 
 ---
 *Tổng hợp Verbatim bởi Antigravity AI - 16/03/2026*
+
+---
+
+# [PHẦN 18] ĐẶC TẢ MVP THỰC CHIẾN (APP CATEGORIES, FEATURES, FLOWS)
+
+Phần này là bản chốt triển khai MVP dựa trên thảo luận thực tế, ưu tiên hoàn thành sản phẩm chạy ổn định end-to-end để demo và bảo vệ ĐATN.
+
+## 1. Nguyên tắc cốt lõi của MVP
+
+- Không gán chùa mặc định khi user vừa đăng nhập.
+- App khởi động ở ngữ cảnh toàn hệ thống (`all_temples`) để tránh sai ngữ cảnh dữ liệu.
+- Chỉ yêu cầu chọn chùa (`selected_temple`) khi chức năng bắt buộc cần `tenant_id` cụ thể (ví dụ: tạo VietQR công đức).
+- Đề xuất chùa gần nhất chỉ là gợi ý (`nearby_suggestion`), không tự động khóa ngữ cảnh toàn app.
+
+## 2. Danh mục chính trong ứng dụng (Bottom Navigation)
+
+1. Trang chủ
+2. Khám phá
+3. Pháp âm
+4. Công đức
+5. Cá nhân
+
+## 3. Chức năng MVP theo từng danh mục
+
+### A. Trang chủ
+- Hiển thị feed tổng hợp toàn hệ thống (tin mới, lịch lễ gần nhất).
+- Khối gợi ý "Chùa gần bạn" dựa trên vị trí hiện tại.
+- Nút nhanh: Khám phá, Hỏi AI, Công đức.
+
+### B. Khám phá
+- Bản đồ + danh sách chùa theo vị trí hiện tại.
+- Tính khoảng cách và sắp xếp gần -> xa.
+- Vào trang chi tiết chùa (địa chỉ, ảnh, giờ lễ, chỉ đường).
+- Bộ lọc cơ bản theo tỉnh/thành.
+
+### C. Pháp âm
+- Danh sách bài pháp thoại.
+- Trình phát audio cơ bản: phát/tạm dừng/tua.
+- Tìm kiếm theo tiêu đề.
+- Yêu thích bài nghe.
+
+### D. Công đức
+- Nhập số tiền và chọn hạng mục công đức.
+- Sinh VietQR động theo chùa/hạng mục.
+- Hiển thị sổ công đức minh bạch (bản ghi đã duyệt).
+- Nếu chưa chọn chùa: bắt buộc mở modal chọn chùa trước khi tạo QR.
+
+### E. Cá nhân
+- Hồ sơ người dùng.
+- Lịch sử hoạt động cơ bản (câu hỏi AI, công đức, bài nghe).
+- Quản lý thông báo.
+- Chuyển ngữ cảnh chùa theo chủ động người dùng.
+
+## 4. Mô hình ngữ cảnh dữ liệu toàn app (Temple Context State)
+
+### Các trạng thái
+- `all_temples`: Mặc định sau login và khi mở app.
+- `selected_temple`: User tự chọn một chùa cụ thể.
+- `nearby_suggestion`: Chùa được gợi ý từ GPS để thao tác nhanh.
+
+### Quy tắc chuyển trạng thái
+- `all_temples -> selected_temple`: User chọn thủ công từ modal/danh sách.
+- `all_temples -> nearby_suggestion`: App gợi ý theo GPS, chờ user xác nhận.
+- `nearby_suggestion -> selected_temple`: User bấm "Dùng chùa này".
+- `selected_temple -> all_temples`: User chọn "Xem toàn hệ thống".
+
+## 5. Luồng hoạt động xử lý MVP (System Flows)
+
+### Flow 1: Khởi động ứng dụng
+1. App kiểm tra phiên đăng nhập.
+2. Nếu chưa đăng nhập -> màn hình Auth.
+3. Nếu đã đăng nhập -> vào `all_temples`.
+4. Tải dữ liệu nền: cấu hình hệ thống, feed trang chủ, danh sách chùa cơ bản.
+5. Nếu có quyền vị trí -> lấy chùa gần nhất để gợi ý, không auto khóa chùa.
+
+### Flow 2: Khám phá chùa gần tôi
+1. User mở tab Khám phá.
+2. App xin quyền vị trí (nếu chưa có).
+3. App gọi RPC PostGIS tìm chùa gần nhất.
+4. Backend trả danh sách chùa + khoảng cách.
+5. App hiển thị map marker + danh sách + bộ lọc.
+
+### Flow 3: AI Dharma Bot (RAG)
+1. User nhập câu hỏi.
+2. App gửi `query` + `context_mode` (`all_temples` hoặc `selected_temple`) lên Edge Function.
+3. Edge Function tạo embedding cho query.
+4. Thực hiện similarity search trong `dharma_embeddings` theo ngữ cảnh.
+5. Ghép prompt + context và gọi model AI.
+6. Trả kết quả cho app kèm trích nguồn ngắn.
+
+### Flow 4: Công đức bằng VietQR
+1. User mở tab Công đức và nhập số tiền.
+2. Nếu chưa có `selected_temple` -> hiển thị modal chọn chùa.
+3. App sinh VietQR động theo `tenant_id` + hạng mục.
+4. User thanh toán qua ngân hàng.
+5. Bản ghi được duyệt sẽ hiển thị vào sổ minh bạch.
+
+## 6. Rule bắt buộc để tránh lỗi ngữ cảnh
+
+- Không auto set `selected_temple` sau login.
+- Mọi API bắt buộc tenant phải kiểm tra điều kiện trước khi gọi.
+- Màn hình luôn hiển thị nhãn ngữ cảnh hiện tại: "Toàn hệ thống" hoặc "Chùa X".
+- Với dữ liệu AI: mặc định hỏi toàn hệ thống; cho phép người dùng bật bộ lọc theo chùa khi cần.
+
+## 7. Phạm vi MVP và ngoài MVP
+
+### Trong MVP (bắt buộc)
+- Auth chạy ổn định.
+- Discovery bằng PostGIS (map + list + khoảng cách).
+- AI RAG bản cơ bản có ngữ cảnh và trả lời dùng được.
+- VietQR + sổ công đức minh bạch bản cơ bản.
+
+### Ngoài MVP (phase sau)
+- AR/nhận diện hình ảnh nâng cao.
+- Geofencing nền phức tạp đa nền tảng.
+- Offline audio dung lượng lớn và đồng bộ sâu.
+
+## 8. Tiêu chí nghiệm thu MVP
+
+1. User đăng nhập và dùng trọn luồng từ khám phá -> AI -> công đức trong một phiên.
+2. Không có lỗi sai tenant do gán mặc định.
+3. Truy vấn chùa gần hoạt động với dữ liệu thật.
+4. AI trả lời có trích ngữ cảnh.
+5. Sổ minh bạch hiển thị đúng dữ liệu đã duyệt.
+
+---
+*Phần 18 được bổ sung để chuẩn hóa triển khai MVP thực tế - 16/03/2026*
+
+---
+
+# [PHẦN 19] PROMPT CHUẨN TRIỂN KHAI MOBILE APP MVP (FULL FLOW + UI STYLE)
+
+Sao chép nguyên khối Prompt dưới đây để dùng cho AI hỗ trợ thiết kế kiến trúc, UI/UX, và đặc tả triển khai chi tiết.
+
+## Prompt Chuẩn
+
+Bạn là Solution Architect + Product Designer + Senior Flutter Engineer.
+
+Nhiệm vụ: Thiết kế và đặc tả chi tiết một ứng dụng di động đa chùa Khmer (Flutter iOS/Android) theo mô hình Multi-tenant Super Client, dùng Supabase làm backend trung tâm, tích hợp GIS (PostGIS), AI RAG (pgvector + Edge Function), và cổng công đức minh bạch (VietQR).
+
+Hãy trả về một bản đặc tả triển khai có thể đưa thẳng cho team dev, theo đúng các yêu cầu sau.
+
+### 1) Bối cảnh và nguyên tắc bắt buộc
+
+- Kiến trúc tổng thể: Web Admin (Next.js) đã có sẵn, Mobile chỉ mở rộng client.
+- Backend: Supabase (PostgreSQL, Auth, Storage, Edge Functions), có PostGIS + pgvector.
+- Không được gán chùa mặc định sau login.
+- App phải chạy theo ngữ cảnh động:
+    - all_temples (mặc định)
+    - selected_temple (user tự chọn)
+    - nearby_suggestion (gợi ý theo GPS)
+- Chỉ ép chọn chùa ở chức năng bắt buộc cần tenant_id cụ thể (đặc biệt là VietQR công đức).
+- Mục tiêu MVP: chạy ổn định end-to-end để demo bảo vệ ĐATN.
+
+### 2) Danh mục tab bắt buộc trong app
+
+Thiết kế Bottom Navigation gồm 5 tab:
+1. Trang chủ
+2. Khám phá
+3. Pháp âm
+4. Công đức
+5. Cá nhân
+
+Hãy mô tả đầy đủ cho từng tab:
+- Mục tiêu nghiệp vụ
+- Danh sách màn hình con
+- Chức năng của từng màn hình
+- Trạng thái loading/empty/error/success
+- Quy tắc dữ liệu đa tenant
+- API cần gọi
+
+### 3) Luồng hoạt động hệ thống cần viết chi tiết
+
+Viết theo dạng step-by-step cho các flow sau:
+
+1. App Launch Flow
+- Kiểm tra session
+- Auth
+- Vào all_temples
+- Tải dữ liệu nền
+- Xin quyền vị trí và tạo nearby_suggestion (không tự khóa tenant)
+
+2. Discovery Flow (Khám phá chùa gần tôi)
+- Permission location
+- Gọi RPC PostGIS tìm chùa gần
+- Render map + list + filter
+- Đi vào trang chi tiết chùa
+
+3. AI Dharma Bot Flow (RAG)
+- Nhập câu hỏi
+- Gửi query + context_mode
+- Embedding query
+- Similarity search trong dharma_embeddings
+- Build prompt + gọi model
+- Trả lời + trích nguồn
+
+4. Merit Flow (VietQR)
+- Nhập số tiền/hạng mục
+- Nếu chưa selected_temple thì mở modal chọn chùa
+- Sinh QR động theo tenant_id
+- Cập nhật sổ minh bạch
+
+5. Temple Context Switching Flow
+- all_temples <-> selected_temple
+- nearby_suggestion -> selected_temple theo xác nhận user
+- Hiển thị context badge trên mọi màn hình
+
+### 4) Thiết kế UI/UX phải cụ thể, không chung chung
+
+Ngôn ngữ thiết kế: Premium Zen
+- Tinh thần: Thanh tịnh, hiện đại, chân thực
+- Visual: Glassmorphism vừa phải, không lạm dụng
+- Trải nghiệm: Dịu, dễ đọc, phù hợp cả người lớn tuổi
+
+Yêu cầu AI phải xuất ra đầy đủ:
+
+1. Design Tokens
+- Màu chính (Saffron, Brown, Bone White) với mã màu đề xuất
+- Semantic colors (success, warning, error, info)
+- Spacing scale, radius, elevation, border
+- Typography scale (ưu tiên readability)
+
+2. Component System
+- App bar, bottom nav, card, chip context, list item, map bottom sheet
+- AI message bubble, citation badge
+- QR panel, transaction item, ledger card
+- Empty/error skeleton states
+
+3. Motion & Interaction
+- Chuyển tab
+- Reveal cho card
+- Loading map và chat
+- Touch feedback, haptic nhẹ ở hành động quan trọng
+
+4. Accessibility
+- Font size hỗ trợ người lớn tuổi
+- Contrast đạt chuẩn
+- Tap target đủ lớn
+- Voice-over friendly labels
+
+### 5) Danh sách màn hình phải liệt kê đến cấp wireflow
+
+Hãy xuất danh sách màn hình theo từng tab, ví dụ:
+- HomeFeedScreen
+- NearbyTempleSheet
+- DiscoveryMapScreen
+- TempleDetailScreen
+- DharmaListScreen
+- DharmaPlayerScreen
+- AIDharmaChatScreen
+- MeritCreateQRScreen
+- MeritLedgerScreen
+- ProfileScreen
+- NotificationSettingsScreen
+- TemplePickerModal
+
+Với mỗi màn hình, bắt buộc mô tả:
+- Mục tiêu
+- Inputs
+- Outputs
+- API dependencies
+- Business rules
+- Error handling
+
+### 6) Đặc tả dữ liệu và API contract MVP
+
+Hãy đề xuất cấu trúc contract cho:
+- find_nearby_temples RPC
+- ask_dharma_ai Edge Function
+- create_dynamic_vietqr payload
+- ledger list query
+- temple search/filter query
+
+Nêu rõ:
+- request schema
+- response schema
+- error codes
+- timeout/retry strategy
+
+### 7) Chất lượng kỹ thuật và kiểm thử
+
+Hãy đề xuất:
+- Kiến trúc Flutter (feature-first + clean layers)
+- State management phù hợp MVP
+- Logging/analytics tối thiểu
+- Test strategy: unit/widget/integration cho các flow cốt lõi
+- Checklist nghiệm thu demo
+
+### 8) Giới hạn phạm vi MVP và phần phase 2
+
+Phân tách rõ:
+- In MVP: Auth, Discovery GIS, AI RAG cơ bản, VietQR cơ bản, Ledger minh bạch
+- Out of MVP: AR nâng cao, geofencing nền phức tạp, offline media lớn
+
+### 9) Định dạng đầu ra bắt buộc
+
+Xuất kết quả theo đúng thứ tự mục sau:
+1. Product Scope Snapshot
+2. Information Architecture
+3. End-to-End Flows
+4. Screen-by-Screen Spec
+5. Visual Design System
+6. API Contracts
+7. Architecture and Testing
+8. Delivery Plan 6-8 tuần
+9. Risks and Mitigations
+
+Viết rõ ràng, có tính triển khai thực tế, tránh mô tả chung chung. Nếu có giả định thì ghi rõ giả định.
+
+---
+*Phần 19 bổ sung Prompt chuẩn để tái sử dụng với AI trong thiết kế và triển khai MVP - 16/03/2026*
+
+đây là ảnh frontend: ![alt text](image-1.png)
+![alt text](image.png)

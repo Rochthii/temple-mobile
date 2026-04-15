@@ -38,18 +38,44 @@ sequenceDiagram
 flowchart TD
     subgraph "Giai đoạn Pre-processing (Admin)"
         A1[Web Admin Content] --> A2[Text Splitter - Chunks]
-        A2 --> A3[Embedding Model - Gemini]
-        A3 --> A4[(pgvector DB)]
+        A2 --> A3[Mapping Categories]
+        A3 --> A4[Embedding Model - Gemini]
+        A4 --> A5[(pgvector DB)]
     end
 
     subgraph "Giai đoạn Truy vấn (Mobile App)"
-        B1[Phật tử hỏi App] --> B2[Vectorize câu hỏi]
-        B2 --> B3[Similarity Search - Cosine]
-        B3 --> B4[Retrieve Top Contexts]
-        B4 --> B5[Prompt + Context -> Gemini Pro]
-        B5 --> B6[AI trả lời bằng giọng văn Nam Tông]
+        B1[Phật tử hỏi App] --> B2[Vectorize & Check Cache]
+        B2 -- Hit --> B7[Sư Số phản hồi nhanh ⚡]
+        B2 -- Miss --> B3[RAG Retrieval]
+        B3 --> B4[Extract Metadata + Category]
+        B4 --> B5[Prompt + Context]
+        B5 --> B6[Gemini 1.5 Flash]
+        B6 --> B7
     end
 ```
+
+### 2.1 Quy trình xử lý (Logic Flow)
+Hệ thống áp dụng kiến trúc **Semantic Caching** để tối ưu hiệu năng:
+- **B1. Embedding:** Câu hỏi được chuyển thành Vector 768 chiều.
+- **B2. Semantic Cache Check:** Quét bảng `ai_query_cache` (ngưỡng 0.95). 
+    - Nếu khớp (Hit): Phản hồi tức thì.
+    - Nếu không (Miss): Thực hiện RAG.
+- **B3. RAG Retrieval:** Tìm dẫn chứng tương đồng nhất từ kho kinh sách.
+- **B4. Enrichment:** Bổ sung thông tin về Chuyên đề (Ví dụ: Kinh Tạng, Luận Tạng...) để tăng độ tin cậy. 
+- **B5. LLM Generation:** Gemini 3 Flash đóng vai "Sư Số" để tổng hợp câu trả lời từ dẫn chứng.
+- **B6. Persistence:** Lưu kết quả vào Cache kèm Citation thông tin chuyên đề.
+
+### 2.2 Cơ chế Cache Invalidation
+- **Tính chính xác:** Khi Admin cập nhật tài liệu nguồn, hệ thống tự động xóa bộ nhớ đệm (Invalidation) để đảm bảo không trả lời sai kiến thức cũ.
+
+---
+
+## 3. Đặc tả Nhân vật AI: Sư Số (Monastic Persona)
+
+Hệ thống RAG không chỉ trả về thông tin khô khan mà được nhân hóa thành vị **"Sư Số"**:
+- **Xưng hô:** Sư xưng là "Sư", gọi người dùng là "con" hoặc "đạo hữu".
+- **Văn phong:** Từ thốn, sáng suốt, sử dụng thuật ngữ Phật giáo Nam tông (Ví dụ: Chánh Biến Tri, Bát Chánh Đạo, Ruộng phước...).
+- **Nguyên tắc trả lời:** Tuyệt đối trung thành với tài liệu dẫn chứng, không bịa đặt (Hallucination protection).
 
 ---
 

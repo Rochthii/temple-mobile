@@ -43,16 +43,41 @@ FOR EACH ROW EXECUTE FUNCTION update_tenants_geog();
 
 ---
 
-## 3. Bảng Embedding hỗ trợ AI Dharma Bot (RAG)
+## 3. Bảng Embedding hỗ trợ AI
+| Tên | Loại | Mô tả | Chi tiết |
+| :--- | :--- | :--- | :--- |
+| `dharma_categories` | Table | Quản lý danh mục/chủ đề Phật học (35 mục chuẩn) | `UUID, name, description` |
+| `dharma_documents` | Table | Lưu thông tin sách, kinh tạng, tác giả | `UUID, title, category_id` |
+| `dharma_embeddings` | Table | Lưu trữ vector embedding 768 chiều (Gemini) | `vector(768)` |
+| `match_dharma_embeddings` | Function | Tìm kiếm RAG + Trả về tên chuyên đề | Cosine Similarity |
+| `ai_query_cache` | Table | Bộ nhớ đệm ngữ nghĩa (Semantic Caching) | Lưu Q&A và Vector |
+| `match_ai_query_cache` | Function | Kiểm tra tương đồng để trích xuất đệm | Threshold 0.95 |
+
 ```sql
--- Lưu trữ các vector đặc trưng của nội dung để AI tìm kiếm
+-- 1. Quản lý Chuyên đề Pháp học cho AI
+CREATE TABLE dharma_categories (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(200) NOT NULL UNIQUE,
+    description TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 2. Lưu trữ thông tin tài liệu gốc
+CREATE TABLE dharma_documents (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title VARCHAR(255) NOT NULL,
+  author VARCHAR(100),
+  tenant_id VARCHAR(50),
+  category_id UUID REFERENCES dharma_categories(id),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 3. Lưu trữ các vector đặc trưng của nội dung để AI tìm kiếm
 CREATE TABLE dharma_embeddings (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
-  content_id UUID, -- Link tới pages.id hoặc dharma_talks.id
-  content_type TEXT, -- 'page', 'talk', 'news'
-  content_text TEXT, -- Đoạn text được cắt nhỏ (Chunks)
-  embedding vector(1536), -- 1536 là số chiều của OpenAI/Gemini embedding
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  document_id UUID REFERENCES dharma_documents(id) ON DELETE CASCADE,
+  content TEXT, -- Đoạn text được cắt nhỏ (Chunks)
+  embedding vector(768), -- 768 là số chiều chuẩn của Google Gemini-Embedding-001 (2026)
   metadata JSONB
 );
 

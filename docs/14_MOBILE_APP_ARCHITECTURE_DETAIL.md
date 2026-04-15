@@ -25,7 +25,7 @@ graph TD
         Nav[Glass Bottom Navigation Bar]
         HomeTab[Home - Smart Feed]
         MapTab[Discovery - OpenStreetMap]
-        AITab[Thầy Số - RAG Chatbot]
+        AITab[Sư Số - Trợ lý Pháp học AI]
         DharmaTab[Dharma - Media Player]
         MeritTab[Merit - Transparent Ledger & VietQR]
         ProfileTab[Profile - Config]
@@ -78,11 +78,13 @@ graph TD
 
 ## 4. Tính năng "Ghi điểm" (Advanced Features)
 
-### **1. AI Dharma Bot (RAG Cố Vấn "Thầy Số")**
+### **1. AI Dharma Bot (Trợ lý Pháp học "Sư Số")**
 - **Quy trình:** 
-    1. Lưu trữ và đánh chỉ mục ngữ nghĩa tài liệu bằng cấu trúc `dharma_documents` và `pgvector` (`dharma_embeddings`) dùng OpenAI `text-embedding-3-small`.
-    2. Mobile (Flutter) gửi câu hỏi lên Deno Edge Function (`rag-chat`).
-    3. AI (`gpt-4o-mini`) truy xuất hàm Cosine Search, tính toán tư vấn theo phong cách thiền sư và trả về **Stream** qua định dạng Server-Sent Events (SSE).
+    1. Lưu trữ và đánh chỉ mục ngữ nghĩa tài liệu bằng cấu trúc `dharma_documents` và `pgvector` (`dharma_embeddings`) dùng chuẩn **Gemini Embedding 001 (768px)**.
+    2. Mobile (Flutter) gửi câu hỏi lên Supabase Edge Function (`rag-chat`).
+    - **AI Chat Service**: Kết nối Gemini 3 Flash qua Edge Functions.
+    - **Semantic Caching Layer**: Tầng đệm ngữ nghĩa thông minh, xử lý truy vấn tương đồng (95% similarity) tại Database để phục vụ kết quả tức thì.
+    - **RAG Engine**: Công cụ trích xuất tri thức từ kho kinh điển Nam Tông, tư vấn theo phong cách Sư Nam Tông Khmer và trả về **Stream** qua định dạng Server-Sent Events (SSE).
     4. Mobile sử dụng `StreamBuilder` để hiển thị chữ kiểu "đang gõ" trên form bong bóng Glassmorphism kèm Trích dẫn (Citation Badges) minh bạch.
 
 ### **2. Augmented Reality (AR) Gateway**
