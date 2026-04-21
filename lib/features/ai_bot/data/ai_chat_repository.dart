@@ -1,3 +1,13 @@
+/// COPYRIGHT (C) 2026 - DHARMA CHAT RAG ENGINE
+/// JOINT INTELLECTUAL PROPERTY:
+/// - Technical Implementation: SaaS Project Owner
+/// - Content curation & Academic metadata: Content Lead
+/// 
+/// This module handles the mobile-specific RAG integration and streaming data
+/// for the standalone AI RAG system.
+library;
+
+
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
